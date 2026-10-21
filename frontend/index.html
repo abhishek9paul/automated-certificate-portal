@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Serverless Certificate Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            display: flex; justify-content: center; align-items: center; 
+            min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box;
+        }
+        .container { 
+            background: rgba(255, 255, 255, 0.95); 
+            backdrop-filter: blur(10px);
+            padding: 40px; border-radius: 16px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2); 
+            width: 100%; max-width: 420px; 
+        }
+        h2 { 
+            text-align: center; color: #1f2937; 
+            margin-top: 0; margin-bottom: 24px; 
+            font-size: 22px; font-weight: 600; 
+        }
+        input { 
+            width: 100%; padding: 14px; margin: 8px 0 16px; 
+            border: 1px solid #d1d5db; border-radius: 8px; 
+            box-sizing: border-box; font-family: 'Inter', sans-serif;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        input:focus { 
+            border-color: #667eea; outline: none; 
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); 
+        }
+        button { 
+            width: 100%; padding: 14px; 
+            background: #4f46e5; color: white; 
+            border: none; border-radius: 8px; 
+            font-size: 16px; font-weight: 500; font-family: 'Inter', sans-serif;
+            cursor: pointer; transition: transform 0.1s, background 0.2s; 
+        }
+        button:hover { background: #4338ca; }
+        button:active { transform: scale(0.98); }
+        .verify-btn { background: #111827; }
+        .verify-btn:hover { background: #1f2937; }
+        .status { text-align: center; margin-top: 16px; font-size: 14px; min-height: 20px; }
+        hr { border: 0; border-top: 1px solid #e5e7eb; margin: 32px 0; }
+        .cert-data { 
+            text-align: left; font-size: 14px; color: #374151;
+            background: #f3f4f6; padding: 16px; 
+            border-radius: 8px; margin-top: 12px; 
+            border-left: 4px solid #10b981;
+            word-break: break-all;
+        }
+        .cert-data strong { color: #111827; }
+        a { color: #4f46e5; text-decoration: none; font-weight: 500; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- GENERATOR SECTION -->
+        <h2>Generate Certificate</h2>
+        <input type="text" id="name" placeholder="Full Name (e.g., Tushar)" required>
+        <input type="text" id="course" placeholder="Course Name (e.g., Cloud Computing 101)" required>
+        <input type="email" id="email" placeholder="Email Address" required>
+        <button onclick="generateCert()">Issue Certificate</button>
+        <div id="gen-status" class="status"></div>
+
+        <hr>
+
+        <!-- VERIFICATION SECTION -->
+        <h2>Verify Certificate</h2>
+        <input type="text" id="verify-id" placeholder="Paste Certificate ID here" required>
+        <button class="verify-btn" onclick="verifyCert()">Verify Authenticity</button>
+        <div id="ver-status" class="status"></div>
+    </div>
+
+    <script>
+        // REPLACE THIS WITH YOUR BASE API GATEWAY URL (WITHOUT /issue OR /verify)
+        const BASE_API_URL = "https://p2s14v7pwa.execute-api.ap-southeast-2.amazonaws.com";
+
+        async function generateCert() {
+            const name = document.getElementById('name').value;
+            const course = document.getElementById('course').value;
+            const email = document.getElementById('email').value;
+            const statusDiv = document.getElementById('gen-status');
+
+            if (!name || !course || !email) {
+                statusDiv.innerText = "Please fill in all fields.";
+                statusDiv.style.color = "#dc2626";
+                return;
+            }
+
+            statusDiv.innerText = "Generating and emailing certificate...";
+            statusDiv.style.color = "#4f46e5";
+
+            try {
+                const response = await fetch(`${BASE_API_URL}/issue`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, course, email })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    statusDiv.innerHTML = `<span style="color: #10b981;">Success! Check your email or <a href="${data.s3_url}" target="_blank">download here</a>.</span>`;
+                } else {
+                    statusDiv.innerText = "Error generating certificate.";
+                    statusDiv.style.color = "#dc2626";
+                }
+            } catch (error) {
+                statusDiv.innerText = "Network error. Check console.";
+                statusDiv.style.color = "#dc2626";
+            }
+        }
+
+        async function verifyCert() {
+            const certId = document.getElementById('verify-id').value;
+            const statusDiv = document.getElementById('ver-status');
+
+            if (!certId) {
+                statusDiv.innerText = "Please enter a Certificate ID.";
+                statusDiv.style.color = "#dc2626";
+                return;
+            }
+
+            statusDiv.innerText = "Querying secure database...";
+            statusDiv.style.color = "#4f46e5";
+
+            try {
+                const response = await fetch(`${BASE_API_URL}/verify?id=${certId}`);
+                const data = await response.json();
+
+                if (response.ok && data.status === "VALID") {
+                    statusDiv.innerHTML = `
+                        <span style="color: #10b981; font-weight: 600;">✅ Valid Authentic Certificate</span>
+                        <div class="cert-data">
+                            <strong>Recipient:</strong> ${data.recipient_name}<br><br>
+                            <strong>Course:</strong> ${data.course}<br><br>
+                            <strong>Issued:</strong> ${data.date_issued}<br><br>
+                            <a href="${data.certificate_url}" target="_blank">View Original PDF</a>
+                        </div>
+                    `;
+                } else {
+                    statusDiv.innerHTML = `<span style="color: #dc2626; font-weight: 600;">❌ Invalid or Not Found</span>`;
+                }
+            } catch (error) {
+                statusDiv.innerText = "Network error during verification.";
+                statusDiv.style.color = "#dc2626";
+            }
+        }
+    </script>
+</body>
+</html>
