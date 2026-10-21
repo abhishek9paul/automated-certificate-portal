@@ -1,6 +1,3 @@
-# Author
-Tushar 24BCE5552
-
 # Serverless Certificate Generator & Verification Portal
 
 A fully serverless, end-to-end cloud application that generates, emails, and cryptographically verifies digital certificates. Built entirely on AWS native services, this project demonstrates event-driven architecture, RESTful API design, and cloud database management.
